@@ -202,15 +202,31 @@ a:hover {
 .movie-container {
   display: flex;
   gap: 20px;
-  flex-wrap: wrap;
-  justify-content: center;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  padding-bottom: 20px;
 }
 
+.movie-container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.movie-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.movie-container::-webkit-scrollbar-track {
+  background: #222;
+}
+
+
 .movie-card {
-  width: 150px;
+  min-width: 150px;
   text-align: center;
   transition: transform 0.3s;
 }
+
 
 .movie-card img {
   width: 100%;
