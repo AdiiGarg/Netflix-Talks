@@ -188,55 +188,7 @@ a:hover {
 
 /* ================ Trending Now Section ================ */
 
-#trending-section {
-  padding: 40px 60px;
-  background-color: #000;
-  color: white;
-}
-
-#trending-section h2 {
-  font-size: 28px;
-  margin-bottom: 20px;
-}
-
-.movie-container {
-  display: flex;
-  gap: 20px;
-  overflow-x: auto;
-  scroll-behavior: smooth;
-  padding-bottom: 20px;
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-.movie-container::-webkit-scrollbar {
-  display: none;
-}
-
-
-
-.movie-card {
-  min-width: 150px;
-  text-align: center;
-  transition: transform 0.3s;
-}
-
-
-.movie-card img {
-  width: 100%;
-  border-radius: 8px;
-}
-
-.movie-card:hover {
-  transform: scale(1.05);
-}
-
-.movie-card p {
-  margin-top: 8px;
-  font-size: 14px;
-}
-
-/* .trending-now {
+.trending-now {
     position: relative;
     padding: 2rem 0 2rem 10vw;
 }
@@ -256,12 +208,12 @@ a:hover {
     padding: 20px 0 0 6px;
 }
 
-Hide scrollbar but keep functionality
+/* Hide scrollbar but keep functionality */
 .trending-row::-webkit-scrollbar {
     display: none;
 }
 
-Poster Styles
+/* Poster Styles */
 .poster-card {
     position: relative;
     flex-shrink: 0;
@@ -316,7 +268,7 @@ Poster Styles
 
 .arrow.right {
     right: 6vw;
-} */
+}
 
 /* ============ Popup on Poster Click ============ */
 .popup-css {
