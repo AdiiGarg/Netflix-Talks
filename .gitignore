@@ -1,1 +1,8 @@
 config.js
+node_modules/
+dist/
+out/
+build/
+.cache/
+*.log
+.DS_Store
