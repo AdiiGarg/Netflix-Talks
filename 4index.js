@@ -247,6 +247,9 @@ function fetchAndDisplayMovies(url, containerId) {
     fetch(url)
         .then((res) => res.json())
         .then((data) => {
+
+            window.electronAPI.cacheMovies(data.results);
+            
             container.innerHTML = "";
             let rank = 1;
 
