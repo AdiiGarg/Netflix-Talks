@@ -1,4 +1,5 @@
 const db = require("./database/db");
+const { saveMovies, getCachedMovies } = require("./services/movieCache");
 
 const { app, BrowserWindow } = require("electron");
 const path = require("path");
