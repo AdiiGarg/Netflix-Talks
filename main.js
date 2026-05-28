@@ -1,3 +1,5 @@
+const db = require("./database/db");
+
 const { app, BrowserWindow } = require("electron");
 const path = require("path");
 const { ipcMain } = require("electron");
