@@ -5,4 +5,4 @@ out/
 build/
 .cache/
 *.log
-.DS_Store
+.DS_Storegit rm -r --cached node_modules
