@@ -71,6 +71,84 @@ ipcMain.handle("download-poster", async (event, movie) => {
 });
 
 
+// ===============================
+
+ipcMain.handle(
+    "download-backdrop",
+    async (event, movie) => {
+
+        const backdropUrl =
+            `https://image.tmdb.org/t/p/original${movie.backdrop_path}`;
+
+        const backdropDir =
+            path.join(
+                __dirname,
+                "cache",
+                "backdrops"
+            );
+
+        if (!fs.existsSync(backdropDir)) {
+
+            fs.mkdirSync(
+                backdropDir,
+                { recursive: true }
+            );
+        }
+
+        const filePath =
+            path.join(
+                backdropDir,
+                `${movie.id}.jpg`
+            );
+
+        try {
+
+            const response =
+                await axios({
+                    url: backdropUrl,
+                    method: "GET",
+                    responseType: "stream"
+                });
+
+            const writer =
+                fs.createWriteStream(
+                    filePath
+                );
+
+            response.data.pipe(
+                writer
+            );
+
+            return new Promise(
+                (
+                    resolve,
+                    reject
+                ) => {
+
+                    writer.on(
+                        "finish",
+                        () => resolve(filePath)
+                    );
+
+                    writer.on(
+                        "error",
+                        reject
+                    );
+                }
+            );
+
+        } catch (err) {
+
+            console.error(
+                "Backdrop download failed:",
+                err.message
+            );
+
+            return null;
+        }
+    }
+);
+
 
 // ===============================
 // Main Window

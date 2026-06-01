@@ -34,10 +34,21 @@ contextBridge.exposeInMainWorld(
                 category
             ),
 
+        getCategoryMovies: (category) =>
+            ipcRenderer.invoke(
+                "get-category-movies",
+                category
+            ),
+
         downloadPoster: (movie) =>
             ipcRenderer.invoke(
                 "download-poster",
                 movie
-            )
+            ),
+        downloadBackdrop: (movie) =>
+            ipcRenderer.invoke(
+                "download-backdrop",
+                movie
+            ),
     }
 );

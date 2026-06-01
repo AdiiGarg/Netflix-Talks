@@ -20,6 +20,7 @@ db.run(`
         poster_path TEXT,
         backdrop_path TEXT,
         local_poster_path TEXT,
+        local_backdrop_path TEXT,
         cached_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY(id, category)
     )

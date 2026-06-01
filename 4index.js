@@ -104,80 +104,285 @@ async function addToMyListFirestore(movie) {
     showToast("Added to My List!", "green");
 }
 
-function loadHeroSlides() {
-    const heroEndpoint = `https://api.themoviedb.org/3/trending/movie/day?api_key=${apiKey}&language=en-US&page=1`;
+async function loadHeroSlides() {
 
-    fetch(heroEndpoint)
-        .then((res) => res.json())
-        .then((data) => {
-            const slides = data.results.slice(0, 10);
-            heroContainer.innerHTML = "";
-            dotsContainer.innerHTML = "";
+    const heroEndpoint =
+        `https://api.themoviedb.org/3/trending/movie/day?api_key=${apiKey}&language=en-US&page=1`;
 
-            slides.forEach((movie, i) => {
-                const bgImg = `https://image.tmdb.org/t/p/original${movie.backdrop_path || movie.poster_path}`;
-                const bgImgLowRes = `https://image.tmdb.org/t/p/w500${movie.backdrop_path || movie.poster_path}`;
-                const posterImg = `https://image.tmdb.org/t/p/original${movie.poster_path || movie.backdrop_path}`;
-                const slide = document.createElement("div");
-                slide.classList.add("hero-slide");
-                if (i === 0) slide.classList.add("active-slide");
-                slide.style.backgroundImage = `url(${bgImg})`;
+    try {
 
-                slide.innerHTML = `
+        const res =
+            await fetch(heroEndpoint);
+
+        const data =
+            await res.json();
+
+        const slides =
+            data.results.slice(0, 10);
+
+        // Cache Hero Movies
+        for (const movie of slides) {
+
+            const localPoster =
+                await window.electronAPI
+                    .downloadPoster(movie);
+
+            const localBackdrop =
+                await window.electronAPI
+                    .downloadBackdrop(movie);
+
+            movie.local_poster_path =
+                localPoster;
+
+            movie.local_backdrop_path =
+                localBackdrop;
+        }
+
+        window.electronAPI.cacheMovies(
+            slides,
+            "hero"
+        );
+
+        console.log(
+            "HERO MOVIES CACHED:",
+            slides.length
+        );
+
+        renderHeroSlides(slides);
+
+    } catch (err) {
+
+        console.log(
+            "OFFLINE HERO MODE"
+        );
+
+        try {
+
+            const slides =
+                await window.electronAPI
+                    .getCategoryMovies(
+                        "hero"
+                    );
+
+            console.log(
+                "CACHED HERO:",
+                slides.length
+            );
+
+            if (
+                !slides ||
+                slides.length === 0
+            ) {
+                return;
+            }
+
+            renderHeroSlides(
+                slides,
+                true
+            );
+
+        } catch (e) {
+
+            console.error(
+                "Offline Hero Failed",
+                e
+            );
+        }
+    }
+}
+
+function renderHeroSlides(
+    slides,
+    offline = false
+) {
+
+    heroContainer.innerHTML = "";
+    dotsContainer.innerHTML = "";
+
+    slides.forEach(
+        (movie, i) => {
+
+            let bgImg;
+            let posterImg;
+
+            if (
+                offline &&
+                movie.local_backdrop_path
+            ) {
+
+                bgImg =
+                    "file:///" +
+                    movie.local_backdrop_path
+                        .replace(/\\/g, "/");
+
+                posterImg = bgImg;
+
+            } else {
+
+                bgImg =
+                    `https://image.tmdb.org/t/p/original${movie.backdrop_path || movie.poster_path}`;
+
+                posterImg =
+                    `https://image.tmdb.org/t/p/original${movie.poster_path || movie.backdrop_path}`;
+            }
+
+            const slide =
+                document.createElement(
+                    "div"
+                );
+
+            slide.classList.add(
+                "hero-slide"
+            );
+
+            if (i === 0)
+                slide.classList.add(
+                    "active-slide"
+                );
+
+            slide.style.backgroundImage =
+                `url("${bgImg}")`;
+
+            slide.innerHTML = `
                 <div class="slide-content">
-                    <h1 class="slide-title">${movie.title}</h1>
-                    <p>${movie.overview}</p>
+
+                    <h1 class="slide-title">
+                        ${movie.title || movie.name}
+                    </h1>
+
+                    <p>
+                        ${movie.overview || ""}
+                    </p>
+
                     <div class="slide-buttons">
-                    <button class="mylist-btn"
-                        data-id="${movie.id}"
-                        data-title="${movie.title}"
-                        data-bg="${bgImg}"
-                        data-bg-low="${bgImgLowRes}"
-                        data-poster="${posterImg}"
-                        data-description="${movie.overview}"
-                        data-tags="${movie.release_date?.split('-')[0]}, Rating: ${movie.vote_average}, Popularity: ${Math.round(movie.popularity)}"
-                    ><i class="fas fa-plus"></i> My List</button>
+
+                        <button
+                            class="mylist-btn"
+                            data-id="${movie.id}"
+                            data-title="${movie.title || movie.name}"
+                            data-bg="${bgImg}"
+                            data-bg-low="${bgImg}"
+                            data-poster="${posterImg}"
+                            data-description="${movie.overview || ""}"
+                            data-tags="Offline Cached Movie"
+                        >
+                            <i class="fas fa-plus"></i>
+                            My List
+                        </button>
+
                     </div>
-                </div>`;
 
-                heroContainer.appendChild(slide);
+                </div>
+            `;
 
-                const dot = document.createElement("span");
-                dot.classList.add("dot");
-                if (i === 0) dot.classList.add("active-dot");
-                dot.addEventListener("click", () => {
-                    clearInterval(slideInterval);
+            heroContainer.appendChild(
+                slide
+            );
+
+            const dot =
+                document.createElement(
+                    "span"
+                );
+
+            dot.classList.add(
+                "dot"
+            );
+
+            if (i === 0)
+                dot.classList.add(
+                    "active-dot"
+                );
+
+            dot.addEventListener(
+                "click",
+                () => {
+
+                    clearInterval(
+                        slideInterval
+                    );
+
                     showSlide(i);
-                    slideInterval = setInterval(nextSlide, 5000);
-                });
-                dotsContainer.appendChild(dot);
-            });
 
-            slideElements = document.querySelectorAll(".hero-slide");
-            dotElements = document.querySelectorAll(".dot");
-            showSlide(0);
+                    slideInterval =
+                        setInterval(
+                            nextSlide,
+                            5000
+                        );
+                }
+            );
 
-            document.querySelectorAll(".mylist-btn").forEach((btn) => {
-                btn.addEventListener("click", () => {
-                    console.log("My List button clicked!");
+            dotsContainer.appendChild(
+                dot
+            );
+        }
+    );
+
+    slideElements =
+        document.querySelectorAll(
+            ".hero-slide"
+        );
+
+    dotElements =
+        document.querySelectorAll(
+            ".dot"
+        );
+
+    showSlide(0);
+
+    document
+        .querySelectorAll(
+            ".mylist-btn"
+        )
+        .forEach((btn) => {
+
+            btn.addEventListener(
+                "click",
+                () => {
+
                     const movie = {
-                        id: btn.dataset.id,
-                        title: btn.dataset.title,
-                        bgImg: btn.dataset.bg,
-                        bgImgLowRes: btn.dataset.bgLow,
-                        poster: btn.dataset.poster,
-                        description: btn.dataset.description,
-                        tags: btn.dataset.tags
+
+                        id:
+                            btn.dataset.id,
+
+                        title:
+                            btn.dataset.title,
+
+                        bgImg:
+                            btn.dataset.bg,
+
+                        bgImgLowRes:
+                            btn.dataset.bgLow,
+
+                        poster:
+                            btn.dataset.poster,
+
+                        description:
+                            btn.dataset.description,
+
+                        tags:
+                            btn.dataset.tags
                     };
-                    addToMyListFirestore(movie);
-                });
-            });
-        })
-        .catch((err) => console.error("Failed to load hero slides", err));
+
+                    addToMyListFirestore(
+                        movie
+                    );
+                }
+            );
+        });
+
+    console.log(
+        "HERO RENDER COMPLETE:",
+        slides.length
+    );
 }
 
 loadHeroSlides();
-slideInterval = setInterval(nextSlide, 5000);
+
+slideInterval =
+    setInterval(
+        nextSlide,
+        5000
+    );
 
 // -------- Movie Rows --------
 const endpoints = {
@@ -336,7 +541,8 @@ async function fetchAndDisplayMovies(url, containerId) {
 
             const cachedMovies =
                 await window.electronAPI
-                    .getCachedMovies(containerId);
+                    .getCategoryMovies(containerId);
+            
 
             console.log(
                 "CACHE RECEIVED:",

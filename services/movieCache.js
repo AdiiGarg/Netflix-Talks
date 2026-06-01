@@ -16,9 +16,10 @@ function saveMovies(
                 overview,
                 poster_path,
                 backdrop_path,
-                local_poster_path
+                local_poster_path,
+                local_backdrop_path
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         movies.forEach((movie) => {
@@ -30,7 +31,8 @@ function saveMovies(
                 movie.overview,
                 movie.poster_path,
                 movie.backdrop_path,
-                movie.local_poster_path || null
+                movie.local_poster_path || null,
+                movie.local_backdrop_path || null
             );
 
         });
