@@ -1,34 +1,72 @@
 //4index.js
-// ===== Firebase Setup =====
-
-
-// import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
-// import {
-//     getFirestore,
-//     doc,
-//     setDoc,
-//     getDoc,
-//     getDocs,
-//     deleteDoc,
-//     updateDoc,
-//     deleteField,
-//     arrayUnion,
-//     arrayRemove,
-//     collection, query, orderBy
-// } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
-// import {
-//     getAuth,
-//     onAuthStateChanged,
-//     signOut
-// } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
 
 // Imports from config.js
 import { firebaseConfig } from "./config.js";
 import { apiKey } from "./config.js";
 
-// const app = initializeApp(firebaseConfig);
-// const db = getFirestore(app);
-// const auth = getAuth(app);
+
+let db = null;
+let auth = null;
+let firebaseAPI = null;
+let firebaseLoaded = false;
+
+async function loadFirebase() {
+
+
+    if (firebaseLoaded)
+        return true;
+
+    if (!navigator.onLine)
+        return false;
+
+    try {
+
+        const firebase =
+            await import(
+                "./firebaseService.js"
+            );
+
+        window.doc = firebase.doc;
+        window.getDoc = firebase.getDoc;
+        window.setDoc = firebase.setDoc;
+        window.deleteDoc = firebase.deleteDoc;
+        window.updateDoc = firebase.updateDoc;
+        window.deleteField = firebase.deleteField;
+        window.arrayUnion = firebase.arrayUnion;
+        window.arrayRemove = firebase.arrayRemove;
+        window.collection = firebase.collection;
+        window.query = firebase.query;
+        window.orderBy = firebase.orderBy;
+        window.getDocs = firebase.getDocs;
+        window.onAuthStateChanged = firebase.onAuthStateChanged;
+        window.signOut = firebase.signOut;
+        
+        firebaseAPI = firebase;
+        window.firebaseAPI =
+            firebase;
+
+        db = firebase.db;
+        auth = firebase.auth;
+
+        firebaseLoaded = true;
+
+        console.log(
+            "Firebase Loaded"
+        );
+
+        return true;
+
+    } catch (err) {
+
+        console.error(
+            "Firebase Load Failed",
+            err
+        );
+
+        return false;
+    }
+}
+
 
 function showToast(message, color = "#00b09b") {
     Toastify({
@@ -75,6 +113,17 @@ function nextSlide() {
 }
 
 async function addToMyListFirestore(movie) {
+    const loaded =
+        await loadFirebase();
+
+    if (!loaded) {
+
+        showToast(
+            "Unavailable Offline"
+        );
+
+        return;
+    }
     console.log("auth.currentUser:", auth.currentUser);
     const user = auth.currentUser;
     if (!user) {
@@ -83,15 +132,25 @@ async function addToMyListFirestore(movie) {
     }
 
     const uid = user.uid;
-    const movieRef = doc(db, "users", uid, "myList", movie.id);
-    const docSnap = await getDoc(movieRef);
+    const movieRef =
+        firebaseAPI.doc(
+            db,
+            "users",
+            uid,
+            "myList",
+            movie.id
+        );
+    const docSnap =
+        await firebaseAPI.getDoc(
+            movieRef
+        );
 
     if (docSnap.exists()) {
         showToast("Already in My List", "#FFD700");
         return;
     }
 
-    await setDoc(movieRef, {
+    await firebaseAPI.setDoc(movieRef, {
         id: movie.id,
         title: movie.title,
         bgImg: movie.bgImg,
@@ -103,6 +162,8 @@ async function addToMyListFirestore(movie) {
     });
     showToast("Added to My List!", "green");
 }
+
+loadFirebase();
 
 async function loadHeroSlides() {
 
@@ -682,19 +743,19 @@ function renderMovies(
         "RENDER COMPLETE"
     );
 
-    // try {
+    try {
 
-    //     addPosterListeners(
-    //         container
-    //     );
+        addPosterListeners(
+            container
+        );
 
-    // } catch (err) {
+    } catch (err) {
 
-    //     console.error(
-    //         "POSTER LISTENER ERROR",
-    //         err
-    //     );
-    // }
+        console.error(
+            "POSTER LISTENER ERROR",
+            err
+        );
+    }
 }
 
 export function addPosterListeners(container) {
@@ -706,7 +767,7 @@ export function addPosterListeners(container) {
     const popupBtn = popup.querySelector("#popup-mylist-btn");
 
     container.querySelectorAll(".movie-poster").forEach((poster) => {
-        poster.addEventListener("click", () => {
+        poster.addEventListener("click", async () => {
             const id = poster.dataset.id;
             const title = poster.dataset.title;
             const lowRes = poster.dataset.poster;
@@ -737,6 +798,18 @@ export function addPosterListeners(container) {
                 description,
                 tags
             };
+            const loaded =
+                await loadFirebase();
+
+            if (!loaded) {
+            
+                popupBtn.innerHTML =
+                    `<i class="fas fa-wifi"></i> Offline`;
+            
+                popupBtn.disabled = true;
+            
+                return;
+            }
 
             onAuthStateChanged(auth, async (user) => {
                 if (!user) {
@@ -1248,43 +1321,58 @@ document.querySelectorAll("#profileDropdown li").forEach((item) => {
 //sign-out button
 const signOutBtn = document.getElementById("signOut");
 
-onAuthStateChanged(auth, (user) => {
-    if (user) {
-        // User is logged in
-        const userRef = doc(db, "users", user.uid);
-        getDoc(userRef).then((docSnap) => {
-            const profileIcon = document.getElementById("profileIcon");
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                const profilePicPath = data.profilePic || "Images/profileIcons/1.jpg"; // fallback
-                profileIcon.src = profilePicPath;
-            } else {
-                profileIcon.src = "Images/profileIcons/1.jpg";
-            }
-        }).catch((error) => {
-            console.error("Error fetching profilePic:", error);
-            document.getElementById("profileIcon").src = "Images/profileIcons/1.jpg";
-        });
+async function initProfile() {
 
-        //sign out btn
-        signOutBtn.innerHTML = `<i class="fas fa-sign-out-alt"></i> Sign Out`;
-        signOutBtn.onclick = () => {
-            signOut(auth)
-                .then(() => {
-                    window.location.replace("3sign_In.html");
-                })
-                .catch((error) => {
-                    console.error("Error during sign out:", error);
-                });
-        };
-    } else {
-        // User is not logged in — show "Sign In" instead
-        signOutBtn.innerHTML = `<i class="fas fa-sign-in-alt"></i> Sign In`;
-        signOutBtn.onclick = () => {
-            window.location.replace("3sign_In.html");
-        };
+    const loaded =
+        await loadFirebase();
+
+    if (!loaded) {
+
+        console.log(
+            "Offline Mode"
+        );
+
+        return;
     }
-});
+
+    firebaseAPI.onAuthStateChanged(auth, (user) => {
+        if (user) {
+            // User is logged in
+            const userRef = doc(db, "users", user.uid);
+            getDoc(userRef).then((docSnap) => {
+                const profileIcon = document.getElementById("profileIcon");
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    const profilePicPath = data.profilePic || "Images/profileIcons/1.jpg"; // fallback
+                    profileIcon.src = profilePicPath;
+                } else {
+                    profileIcon.src = "Images/profileIcons/1.jpg";
+                }
+            }).catch((error) => {
+                console.error("Error fetching profilePic:", error);
+                document.getElementById("profileIcon").src = "Images/profileIcons/1.jpg";
+            });
+
+            //sign out btn
+            signOutBtn.innerHTML = `<i class="fas fa-sign-out-alt"></i> Sign Out`;
+            signOutBtn.onclick = () => {
+                signOut(auth)
+                    .then(() => {
+                        window.location.replace("3sign_In.html");
+                    })
+                    .catch((error) => {
+                        console.error("Error during sign out:", error);
+                    });
+            };
+        } else {
+            // User is not logged in — show "Sign In" instead
+            signOutBtn.innerHTML = `<i class="fas fa-sign-in-alt"></i> Sign In`;
+            signOutBtn.onclick = () => {
+                window.location.replace("3sign_In.html");
+            };
+        }
+    });
+}
 
 document.getElementById("accountBtn").addEventListener("click", () => {
     window.location.href = "account.html";
