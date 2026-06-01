@@ -1,31 +1,34 @@
+//4index.js
 // ===== Firebase Setup =====
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
-import {
-    getFirestore,
-    doc,
-    setDoc,
-    getDoc,
-    getDocs,
-    deleteDoc,
-    updateDoc,
-    deleteField,
-    arrayUnion,
-    arrayRemove,
-    collection, query, orderBy
-} from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
-import {
-    getAuth,
-    onAuthStateChanged,
-    signOut
-} from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
+
+
+// import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
+// import {
+//     getFirestore,
+//     doc,
+//     setDoc,
+//     getDoc,
+//     getDocs,
+//     deleteDoc,
+//     updateDoc,
+//     deleteField,
+//     arrayUnion,
+//     arrayRemove,
+//     collection, query, orderBy
+// } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+// import {
+//     getAuth,
+//     onAuthStateChanged,
+//     signOut
+// } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
 
 // Imports from config.js
 import { firebaseConfig } from "./config.js";
 import { apiKey } from "./config.js";
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
+// const app = initializeApp(firebaseConfig);
+// const db = getFirestore(app);
+// const auth = getAuth(app);
 
 function showToast(message, color = "#00b09b") {
     Toastify({
@@ -241,44 +244,251 @@ function createGlobalPopup() {
     addGlobalPopupListeners();
 }
 
-function fetchAndDisplayMovies(url, containerId) {
-    const container = document.getElementById(containerId);
+async function fetchAndDisplayMovies(url, containerId) {
 
-    fetch(url)
-        .then((res) => res.json())
-        .then((data) => {
+    const container =
+        document.getElementById(containerId);
 
-            window.electronAPI.cacheMovies(data.results);
-            
-            container.innerHTML = "";
-            let rank = 1;
+    if (!container) {
+        console.error(
+            "Container not found:",
+            containerId
+        );
+        return;
+    }
 
-            data.results.forEach((movie) => {
-                const card = document.createElement("div");
-                card.classList.add("poster-card");
+    try {
 
-                card.innerHTML = `
-                ${containerId === "trending" || containerId === "top-rated" ? `<span class="rank">${rank++}</span>` : ""}
-                <img src="https://image.tmdb.org/t/p/w500${movie.poster_path}"
-                    alt="${movie.title}"
-                    class="movie-poster"
-                    data-id="${movie.id}"
-                    data-title="${movie.title}"
-                    data-short-poster="https://image.tmdb.org/t/p/w500${movie.poster_path}"
-                    data-poster="https://image.tmdb.org/t/p/w500${movie.backdrop_path || movie.poster_path}"
-                    data-highres-poster="https://image.tmdb.org/t/p/original${movie.backdrop_path || movie.poster_path}"
-                    data-description="${movie.overview}"
-                    data-tags="${movie.release_date?.split('-')[0]}, Rating: ${movie.vote_average}, Popularity: ${Math.round(movie.popularity)}"
-                />`;
-                container.appendChild(card);
-            });
+        const res = await fetch(url);
 
-            addPosterListeners(container);
-        })
-        .catch((err) => {
-            console.error("TMDB fetch failed", err);
-            container.innerHTML = "<p>Failed to load movies. Please try again later.</p>";
-        });
+        console.log(
+            "FETCH STATUS",
+            containerId,
+            res.status
+        );
+
+        if (!res.ok) {
+            throw new Error(
+                `HTTP ${res.status}`
+            );
+        }
+
+        const data =
+            await res.json();
+
+        // Cache movies + posters
+        
+
+            try {
+
+                for (
+                    const movie of data.results
+                ) {
+
+                    const localPoster =
+                        await window.electronAPI
+                            .downloadPoster(movie);
+
+                    movie.local_poster_path =
+                        localPoster;
+
+                    console.log(
+                        "DOWNLOADED:",
+                        movie.id,
+                        localPoster
+                    );
+                }
+
+                window.electronAPI
+                    .cacheMovies(
+                        data.results,
+                        containerId
+                    );
+
+                console.log(
+                    "MOVIES CACHED:",
+                    data.results.length
+                );
+
+            } catch (e) {
+
+                console.error(
+                    "CACHE SAVE ERROR",
+                    e
+                );
+            }
+        
+
+        renderMovies(
+            data.results,
+            container,
+            containerId
+        );
+
+    } catch (err) {
+
+        console.log(
+            "OFFLINE MODE:",
+            containerId
+        );
+
+        try {
+
+            const cachedMovies =
+                await window.electronAPI
+                    .getCachedMovies(containerId);
+
+            console.log(
+                "CACHE RECEIVED:",
+                cachedMovies.length
+            );
+
+            if (
+                !cachedMovies ||
+                cachedMovies.length === 0
+            ) {
+
+                container.innerHTML =
+                    "<h3 style='color:white'>No Cached Movies Found</h3>";
+
+                return;
+            }
+
+            console.log(
+                "RENDERING CACHE FOR:",
+                containerId,
+                cachedMovies.length
+            );
+
+            renderMovies(
+                cachedMovies,
+                container,
+                containerId
+            );
+
+        } catch (e) {
+
+            console.error(
+                "CACHE ERROR:",
+                e
+            );
+
+            container.innerHTML =
+                "<h3 style='color:red'>Cache Load Failed</h3>";
+        }
+    }
+}
+
+function renderMovies(
+    movies,
+    container,
+    containerId
+) {
+
+    console.log(
+        "renderMovies called:",
+        containerId,
+        movies.length
+    );
+
+    container.innerHTML = "";
+
+    let rank = 1;
+
+    movies.forEach((movie) => {
+
+        console.log(
+            "Rendering movie:",
+            movie.title,
+            movie.local_poster_path
+        );
+
+        const card =
+            document.createElement("div");
+
+        card.classList.add(
+            "poster-card"
+        );
+
+        let posterSrc;
+
+        if (
+            movie.local_poster_path
+        ) {
+
+            posterSrc =
+                "file:///" +
+                movie.local_poster_path
+                    .replace(/\\/g, "/");
+
+        } else {
+
+            posterSrc =
+                `https://image.tmdb.org/t/p/w500${movie.poster_path}`;
+        }
+
+        let backdropSrc;
+
+        if (
+            movie.local_poster_path
+        ) {
+
+            backdropSrc = posterSrc;
+
+        } else {
+
+            backdropSrc =
+                `https://image.tmdb.org/t/p/w500${movie.backdrop_path || movie.poster_path}`;
+        }
+
+        card.innerHTML = `
+        ${
+            containerId === "trending" ||
+            containerId === "top-rated"
+                ? `<span class="rank">${rank++}</span>`
+                : ""
+        }
+
+        <img
+            src="${posterSrc}"
+            alt="${movie.title || movie.name}"
+            class="movie-poster"
+            data-id="${movie.id}"
+            data-title="${movie.title || movie.name}"
+            data-short-poster="${posterSrc}"
+            data-poster="${backdropSrc}"
+            data-highres-poster="${backdropSrc}"
+            data-description="${movie.overview || ""}"
+            data-tags="Offline Cached Movie"
+        />
+        `;
+
+        container.appendChild(card);
+
+        console.log(
+            "APPENDED:",
+            movie.title
+        );
+
+    });
+
+    console.log(
+        "RENDER COMPLETE"
+    );
+
+    // try {
+
+    //     addPosterListeners(
+    //         container
+    //     );
+
+    // } catch (err) {
+
+    //     console.error(
+    //         "POSTER LISTENER ERROR",
+    //         err
+    //     );
+    // }
 }
 
 export function addPosterListeners(container) {
@@ -804,9 +1014,6 @@ function addGlobalPopupListeners() {
 
 createGlobalPopup();
 
-Object.entries(endpoints).forEach(([key, url]) =>
-    fetchAndDisplayMovies(url, key)
-);
 
 // -------- Navbar Dropdown --------
 const profileIcon = document.getElementById("profileIcon");

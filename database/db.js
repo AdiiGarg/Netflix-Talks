@@ -13,12 +13,15 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
 db.run(`
     CREATE TABLE IF NOT EXISTS movies (
-        id INTEGER PRIMARY KEY,
+        id INTEGER,
+        category TEXT,
         title TEXT,
         overview TEXT,
         poster_path TEXT,
         backdrop_path TEXT,
-        cached_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        local_poster_path TEXT,
+        cached_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY(id, category)
     )
 `);
 

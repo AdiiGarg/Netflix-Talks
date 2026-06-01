@@ -1,64 +1,234 @@
 const db = require("./database/db");
-const { saveMovies, getCachedMovies } = require("./services/movieCache");
-const https = require("https");
+const { saveMovies, getCachedMovies, getMoviesByCategory } = require("./services/movieCache");
 const axios = require("axios");
-const { apiKey } = require("./config.node");
-
-const { app, BrowserWindow } = require("electron");
+const fs = require("fs");
 const path = require("path");
-const { ipcMain } = require("electron");
 
+const { app, BrowserWindow, ipcMain } = require("electron");
+
+// ===============================
+// Poster Download
+// ===============================
+ipcMain.handle("download-poster", async (event, movie) => {
+
+    const posterUrl =
+        `https://image.tmdb.org/t/p/w500${movie.poster_path}`;
+
+    const posterDir =
+        path.join(__dirname, "cache", "posters");
+
+    if (!fs.existsSync(posterDir)) {
+        fs.mkdirSync(
+            posterDir,
+            { recursive: true }
+        );
+    }
+
+    const filePath =
+        path.join(
+            posterDir,
+            `${movie.id}.jpg`
+        );
+
+    try {
+
+        const response =
+            await axios({
+                url: posterUrl,
+                method: "GET",
+                responseType: "stream"
+            });
+
+        const writer =
+            fs.createWriteStream(filePath);
+
+        response.data.pipe(writer);
+
+        return new Promise(
+            (resolve, reject) => {
+
+                writer.on(
+                    "finish",
+                    () => resolve(filePath)
+                );
+
+                writer.on(
+                    "error",
+                    reject
+                );
+            }
+        );
+
+    } catch (err) {
+
+        console.error(
+            "Poster download failed:",
+            err.message
+        );
+
+        return null;
+    }
+});
+
+
+
+// ===============================
+// Main Window
+// ===============================
 function createWindow() {
-    const win = new BrowserWindow({
-        width: 1400,
-        height: 900,
-        webPreferences: {
-            preload: path.join(__dirname, "preload.js"),
-            nodeIntegration: false,
-            contextIsolation: true
-        }
-    });
+
+    const preloadPath =
+        path.join(
+            __dirname,
+            "preload.js"
+        );
+
+    console.log(
+        "PRELOAD PATH =",
+        preloadPath
+    );
+
+    const win =
+        new BrowserWindow({
+
+            width: 1400,
+            height: 900,
+
+            webPreferences: {
+                preload: preloadPath,
+                nodeIntegration: false,
+                contextIsolation: true
+            }
+        });
+
+    win.webContents.openDevTools();
 
     win.loadFile("4index.html");
 }
 
-ipcMain.on("message", (event, message) => {
-    console.log("Message from Renderer:", message);
+// ===============================
+// IPC TEST
+// ===============================
+ipcMain.on(
+    "message",
+    (event, message) => {
 
-    event.reply("reply", "Hello from Electron Main Process");
-});
-
-
-
-ipcMain.on("cache-movies", (event, movies) => {
-    saveMovies(movies);
-
-    console.log(
-        "Movies received from frontend and cached"
-    );
-
-    getCachedMovies((cached) => {
         console.log(
-            "Cached Movies Count:",
-            cached.length
+            "Message from Renderer:",
+            message
         );
-    });
-});
 
-
-app.whenReady().then(() => {
-    createWindow();
-    
-    app.on("activate", () => {
-        if (BrowserWindow.getAllWindows().length === 0) {
-            createWindow();
-        }
-    });
-});
-
-
-app.on("window-all-closed", () => {
-    if (process.platform !== "darwin") {
-        app.quit();
+        event.reply(
+            "reply",
+            "Hello from Electron Main Process"
+        );
     }
+);
+
+// ===============================
+// Cache Movies
+// ===============================
+ipcMain.on(
+    "cache-movies",
+    (event, movies, category) => {
+
+        console.log(
+            "CACHE MOVIES RECEIVED:",
+            movies.length,
+            category
+        );
+
+        saveMovies(
+            movies,
+            category
+        );
+
+        getCachedMovies(
+            (cached) => {
+
+                console.log(
+                    "Cached Movies Count:",
+                    cached.length
+                );
+            }
+        );
+    }
+);
+
+
+ipcMain.handle(
+    "get-category-movies",
+    async (event, category) => {
+
+        return new Promise(resolve => {
+
+            getMoviesByCategory(
+                category,
+                resolve
+            );
+
+        });
+
+    }
+);
+
+// ===============================
+// Get Cached Movies
+// ===============================
+ipcMain.handle(
+    "get-cached-movies",
+    async () => {
+
+        return new Promise(
+            (resolve) => {
+
+                getCachedMovies(
+                    (movies) => {
+
+                        console.log(
+                            "Returning cached movies:",
+                            movies.length
+                        );
+
+                        resolve(movies);
+                    }
+                );
+            }
+        );
+    }
+);
+
+// ===============================
+// App Ready
+// ===============================
+app.whenReady().then(() => {
+
+    createWindow();
+
+    app.on(
+        "activate",
+        () => {
+
+            if (
+                BrowserWindow.getAllWindows().length === 0
+            ) {
+                createWindow();
+            }
+        }
+    );
 });
+
+// ===============================
+// Quit
+// ===============================
+app.on(
+    "window-all-closed",
+    () => {
+
+        if (
+            process.platform !== "darwin"
+        ) {
+            app.quit();
+        }
+    }
+);
